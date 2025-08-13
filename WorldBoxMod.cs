@@ -134,11 +134,10 @@ public class WorldBoxMod : MonoBehaviour
                 var successfulInit = new Dictionary<IMod, bool>();
                 foreach (IMod mod in LoadedMods.Where(mod => mod is IStagedLoad))
                 {
-                    SmoothLoader.add(() =>
-                    {
-                        successfulInit.Add(mod, ModCompileLoadService.TryInitMod(mod));
-                    }, "Init Mod " + mod.GetDeclaration().Name);
+                    SmoothLoader.add(() => { successfulInit.Add(mod, ModCompileLoadService.TryInitMod(mod)); },
+                        "Init Mod " + mod.GetDeclaration().Name);
                 }
+
                 foreach (IMod mod in LoadedMods.Where(mod => mod is IStagedLoad))
                 {
                     SmoothLoader.add(() =>
@@ -316,25 +315,23 @@ public class WorldBoxMod : MonoBehaviour
         if (File.Exists(Paths.NMLAutoUpdateModulePath))
         {
             FileInfo file = new(Paths.NMLAutoUpdateModulePath);
-            if (file.LastWriteTimeUtc.Ticks < InternalResourcesGetter.GetLastWriteTime())
-                try
-                {
-                    file.Delete();
-                    LogService.LogInfo($"NeoModLoader.dll is newer than AutoUpdate.dll, " +
-                                       $"re-extract AutoUpdate.dll from NeoModLoader.dll");
-                }
-                catch (Exception e)
-                {
-                    // ignored
-                }
+            //if (file.LastWriteTimeUtc.Ticks < InternalResourcesGetter.GetLastWriteTime())
+            try
+            {
+                file.Delete();
+            }
+            catch (Exception e)
+            {
+                // ignored
+            }
         }
-
+/*
         if (!File.Exists(Paths.NMLAutoUpdateModulePath))
         {
             using Stream stream = NeoModLoaderAssembly.GetManifestResourceStream(
                 "NeoModLoader.resources.assemblies.NeoModLoader.AutoUpdate.dll");
             using var file = new FileStream(Paths.NMLAutoUpdateModulePath, FileMode.CreateNew, FileAccess.Write);
             stream.CopyTo(file);
-        }
+        }*/
     }
 }
