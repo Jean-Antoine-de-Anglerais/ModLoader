@@ -13,11 +13,11 @@ namespace NeoModLoader.ui;
 /// </summary>
 public class ModListWindow : AbstractListWindow<ModListWindow, IMod>
 {
+    private readonly Queue<IMod> to_add = new();
     private ModDeclare clickedMod;
-    private int        clickTimes;
-    private float      lastClickTime;
-    private bool       needRefresh = false;
-    private List<IMod> to_add      = new();
+    private int clickTimes;
+    private float lastClickTime;
+    private bool needRefresh;
 
     private void Update()
     {
@@ -26,8 +26,7 @@ public class ModListWindow : AbstractListWindow<ModListWindow, IMod>
         {
             if (to_add.Any())
             {
-                AddItemToList(to_add[to_add.Count - 1]);
-                to_add.RemoveAt(to_add.Count - 1);
+                AddItemToList(to_add.Dequeue());
                 return;
             }
 
@@ -84,7 +83,7 @@ public class ModListWindow : AbstractListWindow<ModListWindow, IMod>
         ClearList();
         foreach (var loaded_mod in WorldBoxMod.LoadedMods)
         {
-            to_add.Add(loaded_mod);
+            to_add.Enqueue(loaded_mod);
         }
 
         foreach (var mod in WorldBoxMod.AllRecognizedMods.Keys)
@@ -92,7 +91,7 @@ public class ModListWindow : AbstractListWindow<ModListWindow, IMod>
             if (WorldBoxMod.AllRecognizedMods[mod] == ModState.LOADED) continue;
             var virtual_mod = new VirtualMod();
             virtual_mod.OnLoad(mod, null);
-            to_add.Add(virtual_mod);
+            to_add.Enqueue(virtual_mod);
         }
     }
 
@@ -138,6 +137,17 @@ public class ModListWindow : AbstractListWindow<ModListWindow, IMod>
         textText.fontSize = 6;
         textText.supportRichText = true;
 
+        var state_text = new GameObject("StateText", typeof(Text));
+        state_text.transform.SetParent(obj.transform);
+        state_text.transform.localPosition = new Vector3(2.5f, -15.5f);
+        state_text.transform.localScale = Vector3.one;
+        state_text.GetComponent<RectTransform>().sizeDelta = new Vector2(105, 10);
+        var state_textText = state_text.GetComponent<Text>();
+        state_textText.font = LocalizedTextManager.currentFont;
+        state_textText.fontSize = 6;
+        state_textText.supportRichText = true;
+        state_textText.alignment = TextAnchor.LowerLeft;
+
         Vector2 single_button_size = new(22, 22);
         GameObject configure = new GameObject("Configure", typeof(Image), typeof(Button), typeof(TipButton));
         configure.transform.SetParent(obj.transform);
@@ -154,7 +164,7 @@ public class ModListWindow : AbstractListWindow<ModListWindow, IMod>
         configureIcon.transform.localScale = Vector3.one;
         configureIcon.GetComponent<RectTransform>().sizeDelta = single_button_size * 0.875f;
         Image configureIconImage = configureIcon.GetComponent<Image>();
-        configureIconImage.sprite = Resources.Load<Sprite>("ui/icons/iconOptions");
+        configureIconImage.sprite = Resources.Load<Sprite>("ui/icons/iconoptions");
 
         GameObject website = new GameObject("Website", typeof(Image), typeof(Button), typeof(TipButton));
         website.transform.SetParent(obj.transform);
@@ -171,7 +181,7 @@ public class ModListWindow : AbstractListWindow<ModListWindow, IMod>
         websiteIcon.transform.localScale = Vector3.one;
         websiteIcon.GetComponent<RectTransform>().sizeDelta = single_button_size * 0.875f;
         Image websiteIconImage = websiteIcon.GetComponent<Image>();
-        websiteIconImage.sprite = Resources.Load<Sprite>("ui/icons/iconCommunity");
+        websiteIconImage.sprite = Resources.Load<Sprite>("ui/icons/actor_traits/iconcommunity");
 
         GameObject reload = new GameObject("Reload", typeof(Image), typeof(Button), typeof(TipButton));
         reload.transform.SetParent(obj.transform);
@@ -223,6 +233,7 @@ public class ModListWindow : AbstractListWindow<ModListWindow, IMod>
             ModState mod_state = WorldBoxMod.AllRecognizedMods[mod_declare];
 
             Text text = transform.Find("Text").GetComponent<Text>();
+            var state_text = transform.Find("StateText").GetComponent<Text>();
             string mod_name = mod_declare.Name;
             string mod_author = mod_declare.Author;
             string mod_desc = mod_declare.Description;
@@ -307,12 +318,33 @@ public class ModListWindow : AbstractListWindow<ModListWindow, IMod>
                 });
             }
 
+            var current_state_text = mod_state switch
+            {
+                ModState.DISABLED => LM.Get("mod_state_disabled"),
+                ModState.LOADED => LM.Get("mod_state_enabled"),
+                ModState.FAILED => LM.Get("mod_state_failed")
+            };
+            var next_state_text = LM.Get(ModInfoUtils.isModDisabled(mod_declare.UID)
+                ? "mod_next_state_disabled"
+                : "mod_next_state_enabled");
+            state_text.text = $"{current_state_text}, {next_state_text}";
             if (mod_state == ModState.FAILED)
             {
                 icon_tip_button.textOnClick = "ModLoadFailed Title";
                 icon_tip_button.textOnClickDescription = "ModLoadFailed Description";
                 icon_tip_button.text_description_2 = mod_declare.FailReason.ToString();
                 icon.color = Color.red;
+
+                icon.GetComponent<Button>().onClick.AddListener(() =>
+                {
+                    var curr_state = ModInfoUtils.toggleMod(mod_declare.UID);
+                    icon.color = curr_state ? Color.red : Color.yellow;
+
+                    next_state_text = LM.Get(!curr_state
+                        ? "mod_next_state_disabled"
+                        : "mod_next_state_enabled");
+                    state_text.text = $"{current_state_text}, {next_state_text}";
+                });
             }
             else
             {
@@ -327,6 +359,12 @@ public class ModListWindow : AbstractListWindow<ModListWindow, IMod>
                     icon_tip_button.textOnClickDescription =
                         curr_state ? "ModEnabled Description" : "ModDisabled Description";
                     icon.color = curr_state ? Color.white : Color.gray;
+
+                    next_state_text = LM.Get(!curr_state
+                        ? "mod_next_state_disabled"
+                        : "mod_next_state_enabled");
+                    state_text.text = $"{current_state_text}, {next_state_text}";
+
                     if (curr_state)
                     {
                         // Check mod loaded or not has been done in the following method.
