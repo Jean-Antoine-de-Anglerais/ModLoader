@@ -61,6 +61,9 @@
       <Reference Include="Microsoft.CodeAnalysis.CSharp">
         <HintPath>resources\assemblies\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
       </Reference>
+      <Reference Include="Microsoft.CodeAnalysis.VisualBasic">
+        <HintPath>resources\assemblies\Microsoft.CodeAnalysis.VisualBasic.dll</HintPath>
+      </Reference>
       <Reference Include="System.Collections.Immutable">
         <HintPath>resources\assemblies\System.Collections.Immutable.dll</HintPath>
       </Reference>
@@ -161,6 +164,8 @@
       <EmbeddedResource Include="resources\assemblies\Microsoft.CodeAnalysis.dll" />
       <None Remove="resources\assemblies\Microsoft.CodeAnalysis.CSharp.dll" />
       <EmbeddedResource Include="resources\assemblies\Microsoft.CodeAnalysis.CSharp.dll" />
+      <None Remove="resources\assemblies\Microsoft.CodeAnalysis.VisualBasic.dll" />
+      <EmbeddedResource Include="resources\assemblies\Microsoft.CodeAnalysis.VisualBasic.dll" />
       <None Remove="resources\assemblies\Mono.Cecil.dll" />
       <EmbeddedResource Include="resources\assemblies\Mono.Cecil.dll" />
       <None Remove="resources\assemblies\MonoMod.RuntimeDetour.dll" />

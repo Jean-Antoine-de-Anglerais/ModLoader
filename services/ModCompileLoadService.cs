@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.VisualBasic;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Text;
 using ModDeclaration;
@@ -75,25 +76,44 @@ public static class ModCompileLoadService
         var syntaxTrees = new List<SyntaxTree>();
         var code_files = SystemUtils.SearchFileRecursive(pModDecl.FolderPath,
             file_name =>
-                file_name.EndsWith(".cs") && !file_name.StartsWith("."),
+                (file_name.EndsWith(".cs") || file_name.EndsWith(".vb")) && !file_name.StartsWith("."),
             dir_name => !dir_name.StartsWith(".") &&
                         !Paths.IgnoreSearchDirectories.Contains(dir_name));
         var embeded_resources = new List<ResourceDescription>();
 
         bool is_ncms_mod = false;
-        var parse_option = new CSharpParseOptions(LanguageVersion.Latest, preprocessorSymbols: preprocessor_symbols);
+        var cs_parse_option = new CSharpParseOptions(Microsoft.CodeAnalysis.CSharp.LanguageVersion.Latest, preprocessorSymbols: preprocessor_symbols);
+        var vb_parse_option = new VisualBasicParseOptions(Microsoft.CodeAnalysis.VisualBasic.LanguageVersion.Latest, preprocessorSymbols: preprocessor_symbols.Select(s => new KeyValuePair<string, object>(s, 1)));
+
+        string lang = null;
 
         foreach (var code_file in code_files)
         {
+            if(lang == null)
+            {
+                if (code_file.EndsWith(".cs")) lang = "cs";
+                else if (code_file.EndsWith(".vb")) lang = "vb";
+            }
             SourceText sourceText = SourceText.From(File.ReadAllText(code_file), Encoding.UTF8);
-            SyntaxTree syntaxTree =
-                CSharpSyntaxTree.ParseText(
+            SyntaxTree syntaxTree;
+            if (code_file.EndsWith(".vb"))
+            {
+                syntaxTree = VisualBasicSyntaxTree.ParseText(
                     sourceText,
-                    parse_option,
+                    vb_parse_option,
                     code_file.Substring(pModDecl.FolderPath.Length + 1)
                 );
+            }
+            else
+            {
+                syntaxTree = CSharpSyntaxTree.ParseText(
+                    sourceText,
+                    cs_parse_option,
+                    code_file.Substring(pModDecl.FolderPath.Length + 1)
+                );
+            }
             syntaxTrees.Add(syntaxTree);
-            if (!is_ncms_mod)
+            if (!is_ncms_mod && lang == "cs")
             {
                 is_ncms_mod = NCMSCompatibleLayer.IsNCMSMod(syntaxTree);
             }
@@ -128,7 +148,7 @@ public static class ModCompileLoadService
             SyntaxTree global_object_syntaxTree =
                 CSharpSyntaxTree.ParseText(
                     global_object_sourceText,
-                    parse_option,
+                    cs_parse_option,
                     $"{pModDecl.Name}.GlobalObject.cs"
                 );
             syntaxTrees.Add(global_object_syntaxTree);
@@ -167,13 +187,28 @@ public static class ModCompileLoadService
             pModDecl.UID, pModDecl.ParseVersion(), null
         );
 
-        var compilation = CSharpCompilation.Create(
-            $"{pModDecl.UID}",
-            syntaxTrees,
-            list,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-                allowUnsafe: true, deterministic: true, assemblyIdentityComparer: AssemblyIdentityComparer.Default)
-        );
+        Compilation compilation;
+        if (lang == "vb")
+        {
+            compilation = VisualBasicCompilation.Create(
+                $"{pModDecl.UID}",
+                syntaxTrees,
+                list,
+                new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                    deterministic: true, assemblyIdentityComparer: AssemblyIdentityComparer.Default)
+            );
+        }
+        else
+        {
+            compilation = CSharpCompilation.Create(
+                $"{pModDecl.UID}",
+                syntaxTrees,
+                list,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                    allowUnsafe: true, deterministic: true, assemblyIdentityComparer: AssemblyIdentityComparer.Default)
+            );
+        }
+
 
         using MemoryStream dllms = new MemoryStream();
         using MemoryStream pdbms = new MemoryStream();
